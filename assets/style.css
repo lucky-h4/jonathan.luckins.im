@@ -249,6 +249,7 @@ a:hover { color: var(--accent-hover); }
 .sand-swatch[data-color="slate"] { background: #2E6EA6; }
 .sand-swatch[data-color="red"]   { background: #CF142B; }
 .sand-swatch[data-color="coal"]  { background: #3A3432; }
+.sand-swatch[data-color="water"] { background: #5BA3C9; }
 
 .sand-clear-btn {
   padding: 0.3rem 0.8rem;

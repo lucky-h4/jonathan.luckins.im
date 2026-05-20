@@ -112,6 +112,7 @@
             <button class="sand-swatch"        data-color="slate" title="Slate"></button>
             <button class="sand-swatch"        data-color="red"   title="Manx Red"></button>
             <button class="sand-swatch"        data-color="coal"  title="Coal"></button>
+            <button class="sand-swatch"        data-color="water" title="Water"></button>
           </div>
           <button id="sand-clear" class="sand-clear-btn">Clear</button>
         </div>
@@ -147,14 +148,19 @@
     const CW = 720, CH = 300, S = 4;
     canvas.width  = CW;
     canvas.height = CH;
-    const COLS = CW / S;  // 180
-    const ROWS = CH / S;  // 75
+    const COLS = CW / S;
+    const ROWS = CH / S;
+
+    // Upper byte = type (1=sand, 2=water), lower 3 bytes = RGB colour
+    const TYPE_SAND  = 1;
+    const TYPE_WATER = 2;
 
     const PALETTES = {
-      sand:  [0xC8A96E, 0xD4B483, 0xB8995E, 0xDFC090, 0xC4A565],
-      slate: [0x2E6EA6, 0x3A7DB5, 0x245F95, 0x4485BB, 0x1E5585],
-      red:   [0xCF142B, 0xB81227, 0xDE1A30, 0xA50F22, 0xD01A28],
-      coal:  [0x3A3432, 0x2A2826, 0x463E3C, 0x322E2C, 0x3E3836],
+      sand:  { type: TYPE_SAND,  colors: [0xC49A45, 0xD4AA55, 0xB48A35, 0xCC9F50, 0xBA9040] },
+      slate: { type: TYPE_SAND,  colors: [0x2E6EA6, 0x3A7DB5, 0x245F95, 0x4485BB, 0x1E5585] },
+      red:   { type: TYPE_SAND,  colors: [0xCF142B, 0xB81227, 0xDE1A30, 0xA50F22, 0xD01A28] },
+      coal:  { type: TYPE_SAND,  colors: [0x3A3432, 0x2A2826, 0x463E3C, 0x322E2C, 0x3E3836] },
+      water: { type: TYPE_WATER, colors: [0x5BA3C9, 0x4A90BB, 0x6DB5D8, 0x3F82AD, 0x78C0E0] },
     };
     let palette = 'sand';
 
@@ -162,27 +168,45 @@
 
     function idx(x, y) { return y * COLS + x; }
 
-    function randColor() {
+    function randParticle() {
       const p = PALETTES[palette];
-      return p[Math.floor(Math.random() * p.length)];
+      const color = p.colors[Math.floor(Math.random() * p.colors.length)];
+      return (p.type << 24) | color;
     }
 
     function update() {
       for (let y = ROWS - 2; y >= 0; y--) {
         const ltr = (y & 1) === 0;
         for (let i = 0; i < COLS; i++) {
-          const x = ltr ? i : COLS - 1 - i;
+          const x    = ltr ? i : COLS - 1 - i;
           const cell = grid[idx(x, y)];
           if (cell === 0) continue;
-          if (grid[idx(x, y + 1)] === 0) {
-            grid[idx(x, y + 1)] = cell; grid[idx(x, y)] = 0; continue;
-          }
-          const d  = Math.random() < 0.5 ? 1 : -1;
-          const x1 = x + d, x2 = x - d;
-          if (x1 >= 0 && x1 < COLS && grid[idx(x1, y + 1)] === 0) {
-            grid[idx(x1, y + 1)] = cell; grid[idx(x, y)] = 0;
-          } else if (x2 >= 0 && x2 < COLS && grid[idx(x2, y + 1)] === 0) {
-            grid[idx(x2, y + 1)] = cell; grid[idx(x, y)] = 0;
+
+          const type = (cell >>> 24) & 0xFF;
+          const d    = Math.random() < 0.5 ? 1 : -1;
+          const x1   = x + d, x2 = x - d;
+
+          if (type === TYPE_SAND) {
+            if (grid[idx(x, y + 1)] === 0) {
+              grid[idx(x, y + 1)] = cell; grid[idx(x, y)] = 0;
+            } else if (x1 >= 0 && x1 < COLS && grid[idx(x1, y + 1)] === 0) {
+              grid[idx(x1, y + 1)] = cell; grid[idx(x, y)] = 0;
+            } else if (x2 >= 0 && x2 < COLS && grid[idx(x2, y + 1)] === 0) {
+              grid[idx(x2, y + 1)] = cell; grid[idx(x, y)] = 0;
+            }
+
+          } else if (type === TYPE_WATER) {
+            if (grid[idx(x, y + 1)] === 0) {
+              grid[idx(x, y + 1)] = cell; grid[idx(x, y)] = 0;
+            } else if (x1 >= 0 && x1 < COLS && grid[idx(x1, y + 1)] === 0) {
+              grid[idx(x1, y + 1)] = cell; grid[idx(x, y)] = 0;
+            } else if (x2 >= 0 && x2 < COLS && grid[idx(x2, y + 1)] === 0) {
+              grid[idx(x2, y + 1)] = cell; grid[idx(x, y)] = 0;
+            } else if (x1 >= 0 && x1 < COLS && grid[idx(x1, y)] === 0) {
+              grid[idx(x1, y)] = cell; grid[idx(x, y)] = 0;
+            } else if (x2 >= 0 && x2 < COLS && grid[idx(x2, y)] === 0) {
+              grid[idx(x2, y)] = cell; grid[idx(x, y)] = 0;
+            }
           }
         }
       }
@@ -190,8 +214,8 @@
 
     const imgData = ctx.createImageData(CW, CH);
     const buf32   = new Uint32Array(imgData.data.buffer);
-    // BG: RGB(20,19,18) packed as little-endian ABGR = 0xFF121314
-    const BG32    = 0xFF000000 | (18 << 16) | (19 << 8) | 20;
+    // Page bg #f7f6f3 = RGB(247,246,243), packed little-endian ABGR
+    const BG32    = 0xFF000000 | (243 << 16) | (246 << 8) | 247;
 
     function draw() {
       buf32.fill(BG32);
@@ -199,9 +223,10 @@
         for (let x = 0; x < COLS; x++) {
           const cell = grid[idx(x, y)];
           if (cell === 0) continue;
-          const r = (cell >> 16) & 0xFF;
-          const g = (cell >>  8) & 0xFF;
-          const b =  cell        & 0xFF;
+          const rgb = cell & 0x00FFFFFF;
+          const r   = (rgb >> 16) & 0xFF;
+          const g   = (rgb >>  8) & 0xFF;
+          const b   =  rgb        & 0xFF;
           const c32 = 0xFF000000 | (b << 16) | (g << 8) | r;
           for (let dy = 0; dy < S; dy++) {
             const base = (y * S + dy) * CW + x * S;
@@ -226,7 +251,7 @@
       for (let i = 0; i < 7; i++) {
         const x = Math.max(0, Math.min(COLS - 1, cx + Math.floor(Math.random() * 5) - 2));
         const y = Math.max(0, Math.min(ROWS - 1, cy));
-        if (grid[idx(x, y)] === 0) grid[idx(x, y)] = randColor();
+        if (grid[idx(x, y)] === 0) grid[idx(x, y)] = randParticle();
       }
     }
 
