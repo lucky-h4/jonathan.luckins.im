@@ -217,6 +217,63 @@ a:hover { color: var(--accent-hover); }
   color: var(--text-muted);
 }
 
+/* ── Sand ── */
+.sand-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.sand-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.sand-swatches {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.sand-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.15s;
+}
+.sand-swatch.active      { border-color: var(--accent); transform: scale(1.2); }
+.sand-swatch[data-color="sand"]  { background: #C8A96E; }
+.sand-swatch[data-color="slate"] { background: #2E6EA6; }
+.sand-swatch[data-color="red"]   { background: #CF142B; }
+.sand-swatch[data-color="coal"]  { background: #3A3432; }
+
+.sand-clear-btn {
+  padding: 0.3rem 0.8rem;
+  font-size: 0.8rem;
+  font-family: var(--font);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: border-color 0.15s, color 0.15s;
+}
+.sand-clear-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+#sand-canvas {
+  display: block;
+  width: 100%;
+  max-width: 720px;
+  height: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  cursor: crosshair;
+  touch-action: none;
+}
+
 /* ── Responsive ── */
 @media (max-width: 480px) {
   .hero { padding: 3rem 0 2.5rem; }

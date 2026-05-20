@@ -23,6 +23,7 @@
           <li><a href="#about">About</a></li>
           <li><a href="#interests">Interests</a></li>
           <li><a href="#notes">Notes</a></li>
+          <li><a href="#play">Play</a></li>
           <li><a href="#contact">Contact</a></li>
         </ul>
       </nav>
@@ -100,6 +101,24 @@
       </div>
     </section>
 
+    <!-- Sand / Play -->
+    <section class="section section-alt" id="play">
+      <div class="container">
+        <h2>Play</h2>
+        <p class="sand-hint">Hold and drag to pour sand.</p>
+        <div class="sand-controls">
+          <div class="sand-swatches">
+            <button class="sand-swatch active" data-color="sand"  title="Sand"></button>
+            <button class="sand-swatch"        data-color="slate" title="Slate"></button>
+            <button class="sand-swatch"        data-color="red"   title="Manx Red"></button>
+            <button class="sand-swatch"        data-color="coal"  title="Coal"></button>
+          </div>
+          <button id="sand-clear" class="sand-clear-btn">Clear</button>
+        </div>
+        <canvas id="sand-canvas"></canvas>
+      </div>
+    </section>
+
     <!-- Contact -->
     <section class="section section-alt" id="contact">
       <div class="container">
@@ -118,6 +137,124 @@
 
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+
+  <script>
+  (function () {
+    const canvas = document.getElementById('sand-canvas');
+    const ctx    = canvas.getContext('2d');
+
+    const CW = 720, CH = 300, S = 4;
+    canvas.width  = CW;
+    canvas.height = CH;
+    const COLS = CW / S;  // 180
+    const ROWS = CH / S;  // 75
+
+    const PALETTES = {
+      sand:  [0xC8A96E, 0xD4B483, 0xB8995E, 0xDFC090, 0xC4A565],
+      slate: [0x2E6EA6, 0x3A7DB5, 0x245F95, 0x4485BB, 0x1E5585],
+      red:   [0xCF142B, 0xB81227, 0xDE1A30, 0xA50F22, 0xD01A28],
+      coal:  [0x3A3432, 0x2A2826, 0x463E3C, 0x322E2C, 0x3E3836],
+    };
+    let palette = 'sand';
+
+    const grid = new Uint32Array(COLS * ROWS);
+
+    function idx(x, y) { return y * COLS + x; }
+
+    function randColor() {
+      const p = PALETTES[palette];
+      return p[Math.floor(Math.random() * p.length)];
+    }
+
+    function update() {
+      for (let y = ROWS - 2; y >= 0; y--) {
+        const ltr = (y & 1) === 0;
+        for (let i = 0; i < COLS; i++) {
+          const x = ltr ? i : COLS - 1 - i;
+          const cell = grid[idx(x, y)];
+          if (cell === 0) continue;
+          if (grid[idx(x, y + 1)] === 0) {
+            grid[idx(x, y + 1)] = cell; grid[idx(x, y)] = 0; continue;
+          }
+          const d  = Math.random() < 0.5 ? 1 : -1;
+          const x1 = x + d, x2 = x - d;
+          if (x1 >= 0 && x1 < COLS && grid[idx(x1, y + 1)] === 0) {
+            grid[idx(x1, y + 1)] = cell; grid[idx(x, y)] = 0;
+          } else if (x2 >= 0 && x2 < COLS && grid[idx(x2, y + 1)] === 0) {
+            grid[idx(x2, y + 1)] = cell; grid[idx(x, y)] = 0;
+          }
+        }
+      }
+    }
+
+    const imgData = ctx.createImageData(CW, CH);
+    const buf32   = new Uint32Array(imgData.data.buffer);
+    // BG: RGB(20,19,18) packed as little-endian ABGR = 0xFF121314
+    const BG32    = 0xFF000000 | (18 << 16) | (19 << 8) | 20;
+
+    function draw() {
+      buf32.fill(BG32);
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          const cell = grid[idx(x, y)];
+          if (cell === 0) continue;
+          const r = (cell >> 16) & 0xFF;
+          const g = (cell >>  8) & 0xFF;
+          const b =  cell        & 0xFF;
+          const c32 = 0xFF000000 | (b << 16) | (g << 8) | r;
+          for (let dy = 0; dy < S; dy++) {
+            const base = (y * S + dy) * CW + x * S;
+            for (let dx = 0; dx < S; dx++) buf32[base + dx] = c32;
+          }
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+    }
+
+    let pouring = false, pourX = 0, pourY = 0;
+
+    function toGrid(cx, cy) {
+      const r = canvas.getBoundingClientRect();
+      return {
+        x: Math.floor((cx - r.left) / r.width  * COLS),
+        y: Math.floor((cy - r.top)  / r.height * ROWS),
+      };
+    }
+
+    function spawn(cx, cy) {
+      for (let i = 0; i < 7; i++) {
+        const x = Math.max(0, Math.min(COLS - 1, cx + Math.floor(Math.random() * 5) - 2));
+        const y = Math.max(0, Math.min(ROWS - 1, cy));
+        if (grid[idx(x, y)] === 0) grid[idx(x, y)] = randColor();
+      }
+    }
+
+    canvas.addEventListener('mousedown',  e => { pouring = true;  const p = toGrid(e.clientX, e.clientY); pourX = p.x; pourY = p.y; });
+    canvas.addEventListener('mousemove',  e => { if (!pouring) return; const p = toGrid(e.clientX, e.clientY); pourX = p.x; pourY = p.y; });
+    window.addEventListener('mouseup',    ()  => { pouring = false; });
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); pouring = true;  const p = toGrid(e.touches[0].clientX, e.touches[0].clientY); pourX = p.x; pourY = p.y; }, { passive: false });
+    canvas.addEventListener('touchmove',  e => { e.preventDefault(); const p = toGrid(e.touches[0].clientX, e.touches[0].clientY); pourX = p.x; pourY = p.y; }, { passive: false });
+    window.addEventListener('touchend',   ()  => { pouring = false; });
+
+    document.getElementById('sand-clear').addEventListener('click', () => grid.fill(0));
+
+    document.querySelectorAll('.sand-swatch').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.sand-swatch').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        palette = btn.dataset.color;
+      });
+    });
+
+    function loop() {
+      if (pouring) spawn(pourX, pourY);
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+    loop();
+  })();
   </script>
 
 </body>
